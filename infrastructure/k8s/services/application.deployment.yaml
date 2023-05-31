@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: application-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: application
+  template:
+    metadata:
+      labels:
+        app: application
+    spec:
+      initContainers:
+        - name: test-database
+          image: curlimages/curl:7.87.0
+          env:
+            - name: DB_HOST
+              value: "http://database-cluster-ip:8000"
+          command: [ 'sh', '-c' ]
+          args:
+            - |
+              until curl -v -s "$DB_HOST/health" > /dev/null
+              do
+                echo "Waiting for database..."
+                sleep 2
+              done
+      containers:
+        - name: web
+          image: dormammun/gravity-hub
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: application-cluster-ip
+spec:
+  type: ClusterIP
+  selector:
+    app: application
+  ports:
+    - name: application-port
+      protocol: TCP
+      port: 3000
+      targetPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: application-debug-load-balancer
+spec:
+  type: LoadBalancer
+  selector:
+    app: application
+  ports:
+    - name: application-debug-port
+      protocol: TCP
+      port: 9201
+      targetPort: 9201
